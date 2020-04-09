@@ -1,12 +1,25 @@
 import Debug.Trace
 import Data.Function (on)
-import Data.List (sortBy)
+import Data.List
+
+----------------------------------------------------------
+--------------- Custom Variables and Types ---------------
+----------------------------------------------------------
 
 type Candidate = (Char, String)
 type Vote = [(Char, String)]
+type Count = [(Char, Int)]
 
 weight :: Double
 weight = 1000
+seats = 4
+
+
+
+
+----------------------------------------------------------
+---------------- General Cleaning Methods ----------------
+----------------------------------------------------------
 
 -- Takes the first entry of dirtyVotes, removes empty strings and creates a number for each viable candidate
 getAllCandidates :: [[String]] -> [Candidate]
@@ -16,52 +29,73 @@ getAllCandidates xs = zip ['A'..] (drop 2 (head xs))
 getVotes :: [[String]] -> [[String]]
 getVotes xs =  [drop 2 x | x <- xs, "" `notElem` x]
 
--- Assigns 
+-- Assigns a character from the list ['A'..] to each element in each individual vote indicating which candidate each prefrence is for
 pairVotes :: [[String]] -> [Vote]
 pairVotes xs = [zip ['A'..] x | x <- getVotes xs]
 
+-- Filters out any preference that has an asterisk instead of a valid vote
 findStars :: Vote -> Vote
 findStars = filter ((/="*") . snd)
 
+-- Function to go through the entire list of Votes and remove asterisks
 removeStars :: [Vote] -> [Vote]
 removeStars = map findStars
 
+-- Sorts the votes into ascending order (Sort by preference)
 sortVotes :: [Vote] -> [Vote]
 sortVotes = map (sortBy (compare `on` snd))
 
--- checkEachVote :: (Char, String) -> Vote -> Integer
--- checkEachVote _ [] = 0
--- checkEachVote x list = sum $ map (\a -> 1) $ filter (== x) list
+-- Checks each Vote to fund their first preference
+checker :: Char -> Vote -> Int
+checker x list = sum $ map (const 1) $ filter (== (x, "1")) list
 
-checker :: (Char, String) -> Vote -> Integer
-checker x list = sum $ map (const 1) $ filter (== x) list
+-- Loops through the entire set of Votes to find the first preference of each voter
+checkAllVotes :: Char -> [Vote] -> [Int]
+checkAllVotes x = map (checker x)
 
-checkAllVotes :: [Vote] -> [Integer]
-checkAllVotes = map (checker ('A', "1"))
-    -- map (checker ('A', "2")) xs
-    -- map (checker ('A', "3")) xs
-    -- map (checker ('A', "4")) xs
-    -- map (checker ('A', "5")) xs
-    -- map (checker ('B', "1")) xs
-    -- map (checker ('B', "2")) xs
-    -- map (checker ('B', "3")) xs
-    -- map (checker ('B', "4")) xs
-    -- map (checker ('B', "5")) xs
-    -- map (checker ('C', "1")) xs
-    -- map (checker ('C', "2")) xs
-    -- map (checker ('C', "3")) xs
-    -- map (checker ('C', "4")) xs
-    -- map (checker ('C', "5")) xs
-    -- map (checker ('D', "1")) xs
-    -- map (checker ('D', "2")) xs
-    -- map (checker ('D', "3")) xs
-    -- map (checker ('D', "4")) xs
-    -- map (checker ('D', "5")) xs
-    -- map (checker ('E', "1")) xs
-    -- map (checker ('E', "2")) xs
-    -- map (checker ('E', "3")) xs
-    -- map (checker ('E', "4")) xs
-    -- map (checker ('E', "5")) xs
+-- Pairs, rmeoves asterisks and sorts the list of DirtyVotes
+cleanVotes :: [Vote]
+cleanVotes = sortVotes (removeStars (pairVotes dirtyVotes))
+
+
+
+
+
+---------------------------------------------------------
+------------------- Alternative Vote --------------------
+---------------------------------------------------------
+
+-- Finds the quota for a successfull candidate
+getAlternativeQuota :: Int
+getAlternativeQuota = (length cleanVotes `div` 2) + 1
+
+-- Returns a list of integers indicating the amount of first preference votes each candidate recieved
+voteCounter :: [Vote] -> [Int]
+voteCounter xs = [sum (checkAllVotes x cleanVotes) | x <- ['A' .. 'E']]
+
+-- Finds a candidate based on the Char passed into the function
+findCandidate :: Char -> [Candidate] -> String
+findCandidate x (y:ys)
+    | x == fst y = snd y
+    | otherwise = findCandidate x ys
+
+
+getWinner :: String
+getWinner = do
+    let x = zip ['A'..] (voteCounter cleanVotes)
+    let (z:zs) = sortBy (flip compare `on` snd) x
+    findCandidate (fst z) (getAllCandidates dirtyVotes)
+
+-- checkWinner = do
+--     countVotes
+--     if candidateVotes > getAlternativeQuota
+--         candidate == winner
+--     else
+--         removeLast
+--         getLastSecondPref
+--         checkWinner
+
+getSTVQuote = (length cleanVotes `div` (seats + 1)) + 1
 
 dirtyVotes :: [[String]]
 dirtyVotes = [
