@@ -12,8 +12,11 @@ type Count = [(Char, Int)]
 
 weight :: Double
 weight = 1000
-seats = 4
 
+candidates :: [Candidate]
+candidates = getAllCandidates dirtyVotes
+
+seats = 4
 
 
 
@@ -69,9 +72,20 @@ cleanVotes = sortVotes (removeStars (pairVotes dirtyVotes))
 getAlternativeQuota :: Int
 getAlternativeQuota = (length cleanVotes `div` 2) + 1
 
+getAltVoteWinner :: [Vote] -> [Int] -> String
+getAltVoteWinner x y = do
+    let winner = checkWinner y
+    if winner
+        then getWinner y
+        else do
+            let a | 0 `elem` y = zip ['A'..] (removeItem 0 y)
+                  | otherwise = zip ['A'..] y
+            let (b:bs) = sortBy (compare `on` snd) a
+            getAltVoteWinner (resetVote (removeLowest (fst b) x)) (voteCounter (resetVote (removeLowest (fst b) x)))
+
 -- Returns a list of integers indicating the amount of first preference votes each candidate recieved
 voteCounter :: [Vote] -> [Int]
-voteCounter xs = [sum (checkAllVotes x cleanVotes) | x <- ['A' .. 'E']]
+voteCounter xs = [sum (checkAllVotes x xs) | x <- ['A' .. 'E']]
 
 -- Finds a candidate based on the Char passed into the function
 findCandidate :: Char -> [Candidate] -> String
@@ -79,28 +93,76 @@ findCandidate x (y:ys)
     | x == fst y = snd y
     | otherwise = findCandidate x ys
 
-
-getWinner :: String
-getWinner = do
-    let x = zip ['A'..] (voteCounter cleanVotes)
+-- Returns the Full name of the Winner of the Vote
+getWinner :: [Int] -> String
+getWinner xs = do
+    let x = zip ['A'..] xs
     let (z:zs) = sortBy (flip compare `on` snd) x
-    findCandidate (fst z) (getAllCandidates dirtyVotes)
+    findCandidate (fst z) candidates
 
--- checkWinner = do
---     countVotes
---     if candidateVotes > getAlternativeQuota
---         candidate == winner
---     else
---         removeLast
---         getLastSecondPref
---         checkWinner
+-- Checks if the candidate with the highest number of votes has reached the quota yet
+checkWinner :: [Int] -> Bool
+checkWinner xs
+    | True `elem` [x >= getAlternativeQuota | x <- xs] = True
+    | otherwise = False
+
+-- Removes the candidat with the lowest number of votes from the race. Also removes their votes
+removeLowest :: Char -> [Vote] -> [Vote]
+removeLowest x xs = do
+    removeCandidate x candidates
+    zip ['A'..] candidates
+    map (removeVote x) xs
+
+-- Removes individual votes from the list of votes
+removeVote :: Char -> Vote -> Vote
+removeVote _ [] = []
+removeVote x (y:ys) | x == fst y = removeVote x ys
+                    | otherwise = y : removeVote x ys
+
+-- Calls the "changePref" function on each individual vote
+resetVote :: [Vote] -> [Vote]
+resetVote = map changePref
+
+-- Changes the preference of the next choice to the top choice
+changePref :: Vote -> Vote
+changePref [] = []
+changePref [x] = [(fst x, "1")]
+changePref (x:xs) = (fst x, "1") : xs
+
+-- Removes an item from the list (Normally removing 0 from list after votes have been re-counted)
+removeItem :: Int -> [Int] -> [Int]
+removeItem _ [] = []
+removeItem x (y:ys) | x == y    = removeItem x ys
+                    | otherwise = y : removeItem x ys
+
+-- Removes a candidate from the list if they have recieved the lowest number of votes in that round of counting
+removeCandidate :: Char -> [Candidate] -> [Candidate]
+removeCandidate _ [] = []
+removeCandidate x xs = [c | c <- xs, fst c /= x]
+
+
+
+
+
+
+
+-----------------------------------------------------------------
+------------------- Single Transferable Vote --------------------
+-----------------------------------------------------------------
 
 getSTVQuote = (length cleanVotes `div` (seats + 1)) + 1
+
+
+
+
+
+
+
 
 dirtyVotes :: [[String]]
 dirtyVotes = [
     ["","","D. Abbott","E. Balls","A. Burbhm","D. Milliband","E. Milliband"],
-    ["1","Ms D Abbott MP  ","1","*","*","*","*"],
+    ["1","Ms D Abbott MP  ","1","2","3","4","5"],
     ["2","RtHon B W Ainsworth MP ","5","4","3","1","2"],
     ["3","RtHon D Alexander MP ","5","3","4","1","2"],
     ["4","Ms H Alexander MP ","*","*","1","2","3"],
